@@ -1,0 +1,32 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:latest
+    container_name: url-shortener-db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+ 
+
+  url_shortener:
+    container_name: url-shortener-server
+    build: ./docker
+    environment:
+      PORT: 3000
+      VERSION: v1
+      HOST: http://localhost:3000/
+      DATABASE_URL: postgresql://tiguser:simplepassword@db:5432/mydb?schema=tigchallenge
+    ports:
+      - 3000:3000
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - db
+
+

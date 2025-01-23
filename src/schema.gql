@@ -1,0 +1,11 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Query {
+  getOriginalUrl(shortCode: String!): String
+}
+
+type Mutation {
+  shortenUrl(originalUrl: String!): String!
+}
