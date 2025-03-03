@@ -1,11 +1,12 @@
-GET http://localhost:3000/2a71025e
+
+GET http://localhost:3000/000mAUuJNjou
 ###
 
 POST http://localhost:3000/api/v1/shortener
 Content-Type: application/json
 
 {
-  "query": "mutation {\n  shortenUrl(originalUrl: \"https://example.com\")\n}\n"
+  "query": "mutation {\n  shortenUrl(originalUrl: \"https://stackoverflow.com\")\n}\n"
 }
 ###
 
@@ -13,6 +14,6 @@ POST http://localhost:3000/api/v1/shortener
 Content-Type: application/json
 
 {
-  "query": "query {\n  getOriginalUrl(shortCode: \"0000000003\")\n}\n"
+  "query": "query {\n  getOriginalUrl(shortCode: \"000mAUuJNjou\")\n}\n"
 }
 ###

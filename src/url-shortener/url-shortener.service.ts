@@ -4,11 +4,14 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import * as crypto from 'crypto';
 import { idToShortCode } from '@utils/converters';
+import { CONTAINER_ID, NODE_ID, START_DATE } from '@common/constants';
 
 @Injectable()
 export class UrlShortenerService {
+  countPerTick = 0;
+  lastTick = 0;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async shortenUrl(originalURL: string): Promise<string> {
@@ -23,24 +26,14 @@ export class UrlShortenerService {
         return existRecord.shortCode;
       }
 
-      const tempShortCode = this.generateTempShortCode();
+      const shortCode = idToShortCode(this.generateShortCode());
 
-      const newRecord = await this.prisma.urlmapping.create({
+      await this.prisma.urlmapping.create({
         data: {
           originalURL,
-          shortCode: tempShortCode,
+          shortCode: shortCode,
         },
       });
-      const shortCode = idToShortCode(newRecord.id);
-      await this.prisma.urlmapping.update({
-        where: {
-          id: newRecord.id,
-        },
-        data: {
-          shortCode,
-        },
-      });
-
       return shortCode;
     } catch (error) {
       console.error('Error while shortening URL:', error);
@@ -65,7 +58,21 @@ export class UrlShortenerService {
     }
   }
 
-  private generateTempShortCode(): string {
-    return crypto.randomBytes(3).toString('hex');
+  private generateShortCode(): bigint {
+    const currentDate = new Date().valueOf();
+    if (this.lastTick != currentDate) {
+      this.countPerTick = 0;
+      this.lastTick = currentDate;
+    } else {
+      this.countPerTick++;
+    }
+    const differenceInMilliseconds = BigInt(currentDate - START_DATE);
+
+    return (
+      (((((differenceInMilliseconds << 4n) + BigInt(NODE_ID)) << 3n) +
+        BigInt(CONTAINER_ID)) <<
+        8n) +
+      BigInt(this.countPerTick)
+    );
   }
 }

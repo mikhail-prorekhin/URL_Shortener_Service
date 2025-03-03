@@ -22,6 +22,9 @@ services:
       VERSION: v1
       HOST: http://localhost:3000/
       DATABASE_URL: postgresql://tiguser:simplepassword@db:5432/mydb?schema=tigchallenge
+      CONTAINER_ID: 1
+      NODE_ID: 1
+      START_DATE: 1735689600000
     ports:
       - 3000:3000
     volumes:

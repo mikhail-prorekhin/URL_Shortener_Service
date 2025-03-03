@@ -9,6 +9,6 @@ datasource db {
 
 model urlmapping {
   id          Int    @id @default(autoincrement())
-  shortCode   String @unique @db.VarChar(7)
+  shortCode   String @unique @db.VarChar(15)
   originalURL String @unique
 }

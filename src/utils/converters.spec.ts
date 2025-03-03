@@ -1,20 +1,28 @@
 import { idToShortCode } from './converters';
 
 describe('idToShortCode', () => {
-  it('should convert a decimal number to base-36 string', () => {
-    expect(idToShortCode(12345)).toBe('00009IX');
-    expect(idToShortCode(0)).toBe('0000000');
+  test('converts small bigint to base62 string', () => {
+    const input = 12345n;
+    const output = idToShortCode(input);
+    expect(output).toBe('0000000003D7');
   });
 
-  it('should throw an error if the number exceeds 10 characters in base-36', () => {
-    const largeNumber = 78364164097;
-    try {
-      idToShortCode(largeNumber);
-      fail();
-    } catch (error) {
-      expect((error as Error).message).toBe(
-        'The decimal number is too large to fit in maximum characters.',
-      );
-    }
+  test('converts large bigint to base62 string', () => {
+    const input = 9876543210123456789n;
+    const output = idToShortCode(input);
+    expect(output).toBe('0BlafhneO193');
+  });
+
+  test('converts zero to base62 string', () => {
+    const input = 0n;
+    const output = idToShortCode(input);
+    expect(output).toBe('000000000000');
+  });
+
+  test('throws error for bigint exceeding max length', () => {
+    const input = 123456789012345678901234567890n;
+    expect(() => idToShortCode(input)).toThrow(
+      'The decimal number is too large to fit in maximum characters.',
+    );
   });
 });

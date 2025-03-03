@@ -59,11 +59,20 @@ If you try to shorten an existing URL, the service will return the already store
 - **Base62 Encoding**
 
 To avoid collisions and eliminate the need for additional database checks (which would lead to extra DB access) or advanced techniques like a Bloom Filter (which is definitely outside the scope of this task),
-I chose **Encoding**. For simplicity, the encoding uses only numeric digits and capital letters.
+I chose **Encoding**.
 
-There is no need to use a distributed unique ID generator in this context, as the database ID is sufficient for the challenge task.
+### Distributed unique ID
 
-The biggest disadvantage of this approach is the predictability of short codes, which makes the system potentially vulnerable.
+To generate unique IDs that can be used across multiple nodes while preserving chronological order, a composite 64-bit ID is utilized.
+
+ID Structure:
+
+- **Timestamp (41 bits):** Represents the number of milliseconds elapsed since the beginning of 2025.
+- **Data NODE ID (4 bits):** Allows for 2⁴ = 16 nodes (data centers).
+- **Machine ID (3 bits):** Allows for 2³ = 8 machines per node.
+- **Sequence Number (8 bits):** Enables each machine to generate up to 2⁸ = 256 unique IDs per millisecond.
+
+<br>This design ensures efficient and scalable ID generation, making it suitable even for high-load production environments.
 
 ### Possible usecases
 

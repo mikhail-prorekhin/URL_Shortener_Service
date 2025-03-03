@@ -6,7 +6,7 @@ GRANT ALL PRIVILEGES ON SCHEMA tigchallenge TO tiguser;
 
 CREATE TABLE tigchallenge.URLMapping(
     id SERIAL PRIMARY KEY,
-    "shortCode" VARCHAR(7) UNIQUE NOT NULL,
+    "shortCode" VARCHAR(15) UNIQUE NOT NULL,
     "originalURL" TEXT UNIQUE NOT NULL   
 );
 

@@ -1,33 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UrlShortenerService } from './url-shortener.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { idToShortCode } from '@utils/converters';
 import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import * as crypto from 'crypto';
-import { idToShortCode } from '@utils/converters';
 
-jest.mock('@utils/converters');
+jest.mock('@utils/converters', () => ({
+  idToShortCode: jest.fn(),
+}));
 
 describe('UrlShortenerService', () => {
   let service: UrlShortenerService;
   let prisma: PrismaService;
 
+  const mockPrismaService = {
+    urlmapping: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
+  } as unknown as PrismaService;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UrlShortenerService,
-        {
-          provide: PrismaService,
-          useValue: {
-            urlmapping: {
-              findUnique: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-            },
-          },
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -35,64 +34,58 @@ describe('UrlShortenerService', () => {
     prisma = module.get<PrismaService>(PrismaService);
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe('shortenUrl', () => {
     it('should throw BadRequestException if originalURL is empty', async () => {
       await expect(service.shortenUrl('')).rejects.toThrow(BadRequestException);
     });
 
-    it('should return existing shortCode if URL already exists', async () => {
-      const mockShortCode = 'mockShortCode';
-      jest.spyOn(prisma.urlmapping, 'findUnique').mockResolvedValueOnce({
-        id: 1,
-        originalURL: 'https://example.com',
-        shortCode: mockShortCode,
-      });
+    it('should return an existing shortCode if the original URL is already stored', async () => {
+      const originalURL = 'https://example.com';
+      const shortCode = 'abc123';
+      prisma.urlmapping.findUnique = jest.fn().mockResolvedValue({ shortCode });
 
-      const result = await service.shortenUrl('https://example.com');
-      expect(result).toBe(mockShortCode);
+      const result = await service.shortenUrl(originalURL);
+
+      expect(result).toBe(shortCode);
+      expect(prisma.urlmapping.findUnique).toHaveBeenCalledWith({
+        where: { originalURL },
+      });
     });
 
-    it('should generate a new shortCode and save it in the database', async () => {
-      const mockTempShortCode = 'tempCode';
-      const mockShortCode = 'shortCode123';
-      jest.spyOn(crypto, 'randomBytes').mockReturnValue({
-        toString: () => mockTempShortCode,
-      } as unknown as void);
+    it('should create a new shortCode if the original URL does not exist', async () => {
+      const originalURL = 'https://example.com';
+      const generatedId = BigInt(123456);
+      const shortCode = 'newCode';
 
-      (idToShortCode as jest.Mock).mockReturnValue(mockShortCode);
+      prisma.urlmapping.findUnique = jest.fn().mockResolvedValue(null);
+      (idToShortCode as jest.Mock).mockReturnValue(shortCode);
+      prisma.urlmapping.create = jest
+        .fn()
+        .mockResolvedValue({ originalURL, shortCode });
 
-      jest.spyOn(prisma.urlmapping, 'create').mockResolvedValueOnce({
-        id: 1,
-        originalURL: 'https://example.com',
-        shortCode: mockTempShortCode,
-      });
-      jest.spyOn(prisma.urlmapping, 'update').mockResolvedValueOnce({
-        id: 1,
-        originalURL: 'https://example.com',
-        shortCode: mockShortCode,
-      });
+      jest
+        .spyOn(service as any, 'generateShortCode')
+        .mockImplementation(() => generatedId);
 
-      const result = await service.shortenUrl('https://example.com');
-      expect(result).toBe(mockShortCode);
+      const result = await service.shortenUrl(originalURL);
+
+      expect(result).toBe(shortCode);
       expect(prisma.urlmapping.create).toHaveBeenCalledWith({
-        data: {
-          originalURL: 'https://example.com',
-          shortCode: mockTempShortCode,
-        },
+        data: { originalURL, shortCode },
       });
-      expect(prisma.urlmapping.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: { shortCode: mockShortCode },
-      });
-
-      expect(1).toBe(1);
     });
 
     it('should throw InternalServerErrorException on database error', async () => {
-      jest
-        .spyOn(prisma.urlmapping, 'findUnique')
-        .mockRejectedValueOnce(new Error('DB error'));
-      await expect(service.shortenUrl('https://example.com')).rejects.toThrow(
+      const originalURL = 'https://example.com';
+      prisma.urlmapping.findUnique = jest
+        .fn()
+        .mockRejectedValue(new Error('Database error'));
+
+      await expect(service.shortenUrl(originalURL)).rejects.toThrow(
         InternalServerErrorException,
       );
     });
@@ -105,32 +98,46 @@ describe('UrlShortenerService', () => {
       );
     });
 
-    it('should return the original URL if the shortCode exists', async () => {
-      jest.spyOn(prisma.urlmapping, 'findUnique').mockResolvedValueOnce({
-        id: 1,
-        originalURL: 'https://example.com',
-        shortCode: 'shortCode123',
-      });
+    it('should return originalURL if shortCode exists', async () => {
+      const shortCode = 'abc123';
+      const originalURL = 'https://example.com';
+      prisma.urlmapping.findUnique = jest
+        .fn()
+        .mockResolvedValue({ originalURL });
 
-      const result = await service.getOriginalUrl('shortCode123');
-      expect(result).toBe('https://example.com');
+      const result = await service.getOriginalUrl(shortCode);
+
+      expect(result).toBe(originalURL);
+      expect(prisma.urlmapping.findUnique).toHaveBeenCalledWith({
+        where: { shortCode },
+      });
     });
 
-    it('should return null if the shortCode does not exist', async () => {
-      jest.spyOn(prisma.urlmapping, 'findUnique').mockResolvedValueOnce(null);
+    it('should return null if shortCode does not exist', async () => {
+      const shortCode = 'abc123';
+      prisma.urlmapping.findUnique = jest.fn().mockResolvedValue(null);
 
-      const result = await service.getOriginalUrl('nonExistentCode');
+      const result = await service.getOriginalUrl(shortCode);
+
       expect(result).toBeNull();
     });
 
     it('should throw InternalServerErrorException on database error', async () => {
-      jest
-        .spyOn(prisma.urlmapping, 'findUnique')
-        .mockRejectedValueOnce(new Error('DB error'));
+      const shortCode = 'abc123';
+      prisma.urlmapping.findUnique = jest
+        .fn()
+        .mockRejectedValue(new Error('Database error'));
 
-      await expect(service.getOriginalUrl('shortCode123')).rejects.toThrow(
+      await expect(service.getOriginalUrl(shortCode)).rejects.toThrow(
         InternalServerErrorException,
       );
+    });
+  });
+
+  describe('generateShortCode', () => {
+    it('should return a unique short code as bigint', () => {
+      const result = (service as any).generateShortCode();
+      expect(typeof result).toBe('bigint');
     });
   });
 });
